@@ -255,63 +255,191 @@ make -j4
 
 ## 第5步：验证与运行
 
-### 5.1 选项 A：自动测试（最推荐）
+### 5.1 选项 A：启用并运行自动测试（最推荐）
 
-如果编译时启用了 `BUILD_TESTING=ON`，可以运行自动测试：
+#### 5.1.1 启用测试功能
+
+**重要**：默认情况下，CMake 配置时 `BUILD_TESTING=OFF`，需要手动启用：
 
 ```bash
-# 安装 Python 测试依赖（如果还没安装）
-sudo apt install -y python3 python3-pip
-pip3 install numpy pandas
-
-# 运行测试（需要先编译）
-ctest
+# 在 build 目录下重新配置 CMake，启用测试
+cd ~/openfast/build
+cmake .. -DBUILD_TESTING=ON
 ```
 
 **说明**：
-- `ctest` 会自动找到 `reg_tests/r-test` 中的测试案例
-- 调用编译好的 `openfast` 程序运行测试
-- 你会看到大量 `Test #1 ... Pass`, `Test #2 ... Pass`...
+- 如果已经配置过，可以重新运行 `cmake .. -DBUILD_TESTING=ON` 来更新配置
+- 启用测试后，CMake 会配置 CTest 测试框架
 
-**预期输出**：
+#### 5.1.2 安装 Python 测试依赖
+
+测试框架需要 Python 和相关的科学计算库：
+
+```bash
+# 安装 Python 3 和 pip
+sudo apt install -y python3 python3-pip
+
+# 安装测试所需的 Python 库
+pip3 install numpy pandas bokeh
 ```
-Test project /home/timi/openfast/build
-    Start 1: AeroDyn_Driver
- 1/XX Test #1: AeroDyn_Driver ...................   Passed
- 2/XX Test #2: BeamDyn_Driver ...................   Passed
- ...
-```
 
-**只要最后没有 `Failed`，就证明编译完美无缺。**
+**依赖说明**（来自 `reg_tests/README.md`）：
+- `numpy`：数值计算库
+- `pandas`：数据处理库
+- `bokeh`：绘图库（可选，用于生成测试报告）
 
-### 5.2 选项 B：手动运行一个案例
-
-如果你想亲手运行一次仿真：
+#### 5.1.3 运行自动测试
 
 ```bash
 # 确保在 build 目录
 cd ~/openfast/build
 
-# 运行 5MW Baseline 案例
-./glue-codes/openfast/openfast \
-    ../reg_tests/r-test/glue-codes/openfast/5MW_Baseline/NRELOffshrBsline5MW_Onshore.fst
+# 运行所有测试
+ctest
+
+# 或者运行特定标签的测试
+ctest -L openfast          # 只运行 OpenFAST 测试
+ctest -L elastodyn         # 只运行 ElastoDyn 相关测试
+ctest -L offshore          # 只运行海上风机测试
+
+# 显示详细输出
+ctest -VV
 ```
 
 **说明**：
-- 可执行文件：`./glue-codes/openfast/openfast`
-- 测试案例：`../reg_tests/r-test/glue-codes/openfast/5MW_Baseline/NRELOffshrBsline5MW_Onshore.fst`
+- `ctest` 会自动找到 `reg_tests/r-test` 中的测试案例
+- 调用编译好的 `openfast` 程序运行测试
+- 测试结果会保存在 `build/reg_tests/` 目录下
+- 你会看到大量 `Test #1 ... Pass`, `Test #2 ... Pass`...
 
 **预期输出**：
 ```
-OpenFAST
-Copyright (C) 2024 National Renewable Energy Laboratory
-...
-Running OpenFAST.
-...
-Simulation completed.
+Test project /home/timi/openfast/build
+    Start 1: AWT_YFix_WSt
+ 1/XX Test #1: AWT_YFix_WSt ...................   Passed
+ 2/XX Test #2: AWT_YFree_WSt ..................   Passed
+ 3/XX Test #3: 5MW_Land_DLL_WTurb .............   Passed
+ ...
+```
+
+**只要最后没有 `Failed`，就证明编译完美无缺。**
+
+### 5.2 选项 B：手动运行测试案例
+
+#### 5.2.1 重要说明：5MW_Baseline 目录
+
+**注意**：`5MW_Baseline` 目录**不是**一个测试案例，而是一个**数据目录**，包含：
+- 各种模块的输入文件（`.dat` 文件）
+- 气动数据（`AeroData/`）
+- 叶片数据（`Airfoils/`）
+- 水动力数据（`HydroData/`）
+- 控制器数据（`ServoData/`）
+
+这些数据被其他测试案例**引用**，而不是直接运行。
+
+#### 5.2.2 实际可用的测试案例
+
+以下是一些实际存在的测试案例（每个目录都包含对应的 `.fst` 文件）：
+
+**简单陆地案例（推荐初学者）**：
+```bash
+# 确保在 build 目录
+cd ~/openfast/build
+
+# 案例 1：5MW 陆地风机 - 模态分析
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/5MW_Land_ModeShapes/5MW_Land_ModeShapes.fst
+
+# 案例 2：5MW 陆地风机 - 动态链接库控制器
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/5MW_Land_DLL_WTurb/5MW_Land_DLL_WTurb.fst
+
+# 案例 3：AWT 风机 - 固定偏航
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/AWT_YFix_WSt/AWT_YFix_WSt.fst
+```
+
+**海上风机案例**：
+```bash
+# 案例 4：5MW OC3 Spar 浮式风机
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/5MW_OC3Spar_DLL_WTurb_WavesIrr/5MW_OC3Spar_DLL_WTurb_WavesIrr.fst
+
+# 案例 5：5MW OC3 单桩风机
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/5MW_OC3Mnpl_DLL_WTurb_WavesIrr/5MW_OC3Mnpl_DLL_WTurb_WavesIrr.fst
+```
+
+**其他配置案例**：
+```bash
+# 案例 6：使用 BeamDyn 高级梁模型
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/5MW_Land_BD_DLL_WTurb/5MW_Land_BD_DLL_WTurb.fst
+
+# 案例 7：使用 AeroDisk 气动盘模型
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/5MW_Land_DLL_WTurb_ADsk/5MW_Land_DLL_WTurb_ADsk.fst
+```
+
+#### 5.2.3 运行说明
+
+**基本语法**：
+```bash
+./glue-codes/openfast/openfast <输入文件路径>
+```
+
+**参数说明**：
+- 可执行文件：`./glue-codes/openfast/openfast`
+- 输入文件：`.fst` 文件（FAST 主输入文件）
+- 相对路径：从 `build` 目录出发，使用 `../` 访问源码目录
+
+**预期输出**：
+```
+ **************************************************************************************************
+ OpenFAST
+
+ Copyright (C) 2025 National Renewable Energy Laboratory
+ ...
+ OpenFAST-v4.1.2-1-gd08d931f
+ ...
+ Running ElastoDyn.
+ Running InflowWind.
+ Running AeroDyn.
+ Running ServoDyn.
+ ...
+  Time: 0 of 6000 seconds.
+  Time: 5 of 6000 seconds.
+  Time: 10 of 6000 seconds.
+ ...
+ Simulation completed.
 ```
 
 **当你看到终端开始滚动仿真时间，你就 100% 成功了！**
+
+#### 5.2.4 输出文件说明
+
+运行完成后，会在测试案例目录下生成以下文件：
+
+- **`.outb`**：二进制输出文件（包含所有输出通道的时间序列）
+- **`.out`**：ASCII 输出文件（可读的文本格式）
+- **`.ech`**：回显文件（输入文件的副本，包含注释）
+- **`.sum`**：摘要文件（仿真摘要信息）
+- **`.log`**：日志文件（如果使用 Python 脚本运行）
+
+#### 5.2.5 测试案例分类参考
+
+根据 `reg_tests/CTestList.cmake`，测试案例按以下标签分类：
+
+- **`openfast`**：OpenFAST 主程序测试
+- **`elastodyn`**：结构动力学模块
+- **`aerodyn`**：气动力学模块
+- **`servodyn`**：控制系统模块
+- **`hydrodyn`**：水动力学模块
+- **`offshore`**：海上风机配置
+- **`beamdyn`**：高级梁模型
+- **`linear`**：线性化分析
+
+你可以根据需求选择合适的测试案例。
 
 ### 5.3 选项 C：安装到系统（可选）
 
@@ -372,17 +500,38 @@ sudo apt install -y cmake
 # 或从源码编译安装
 ```
 
-### 问题 5：测试失败（ctest）
+### 问题 5：ctest 报错 "No test configuration file found!"
 
-**原因**：可能缺少 Python 依赖
+**原因**：编译时未启用 `BUILD_TESTING=ON`
+
+**解决方案**：
+```bash
+# 重新配置 CMake，启用测试
+cd ~/openfast/build
+cmake .. -DBUILD_TESTING=ON
+
+# 然后运行 ctest
+ctest
+```
+
+### 问题 6：测试失败（ctest）
+
+**原因**：可能缺少 Python 依赖或测试数据问题
 
 **解决方案**：
 ```bash
 # 安装 Python 依赖
 pip3 install numpy pandas bokeh
+
+# 检查测试数据是否存在
+ls -la reg_tests/r-test/glue-codes/openfast/
+
+# 如果 r-test 为空，重新初始化子模块
+cd ~/openfast
+git submodule update --init --recursive
 ```
 
-### 问题 6：找不到可执行文件
+### 问题 7：找不到可执行文件
 
 **原因**：编译未完成或路径错误
 
@@ -394,6 +543,20 @@ ls -la glue-codes/openfast/openfast
 
 # 如果文件不存在，重新编译
 make openfast
+```
+
+### 问题 8：测试案例文件不存在
+
+**原因**：使用了不存在的测试案例路径（如 `5MW_Baseline` 目录没有 `.fst` 文件）
+
+**解决方案**：
+```bash
+# 查找实际存在的测试案例
+find reg_tests/r-test/glue-codes/openfast -name "*.fst" -type f
+
+# 使用实际存在的案例，例如：
+./glue-codes/openfast/openfast \
+    ../reg_tests/r-test/glue-codes/openfast/5MW_Land_ModeShapes/5MW_Land_ModeShapes.fst
 ```
 
 ---
@@ -418,12 +581,18 @@ cmake ..
 # 4. 编译
 make -j$(nproc)
 
-# 5. 验证
+# 5. 验证版本
 ./glue-codes/openfast/openfast -v
 
-# 6. 运行测试案例
+# 6. 运行测试案例（选择一个实际存在的案例）
+# 简单案例：5MW 陆地风机模态分析
 ./glue-codes/openfast/openfast \
-    ../reg_tests/r-test/glue-codes/openfast/5MW_Baseline/NRELOffshrBsline5MW_Onshore.fst
+    ../reg_tests/r-test/glue-codes/openfast/5MW_Land_ModeShapes/5MW_Land_ModeShapes.fst
+
+# 或者启用测试并运行自动测试
+cmake .. -DBUILD_TESTING=ON
+pip3 install numpy pandas bokeh
+ctest
 ```
 
 ---
@@ -469,4 +638,5 @@ make -j$(nproc)
 - **第2步（子模块初始化）必须执行**，否则测试数据为空
 - **使用 `make -j$(nproc)` 并行编译**，充分利用多核 CPU
 
+祝你编译顺利！🎉
 
